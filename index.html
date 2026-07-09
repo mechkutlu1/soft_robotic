@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EPYK Soft Finger Lab — Pneumatic Silicone Finger Simulator</title>
+<meta name="description" content="Interactive simulator of a bending pneumatic artificial muscle (silicone finger): pressure, wall thickness and material effects, based on Project 122M619 experimental and FEA data.">
+<meta name="theme-color" content="#10202e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#10202e;          /* deep pneumatic navy */
+  --ink-soft:#3d5165;
+  --bench:#e9eef3;        /* lab-bench cool grey */
+  --panel:#ffffff;
+  --line:#ccd7e0;
+  --air:#0e7ab8;          /* compressed-air blue */
+  --air-deep:#085a8a;
+  --silicone:#f3f6f9;
+  --silicone-edge:#9fb4c4;
+  --fiber:#c8901f;        /* glass-fibre amber */
+  --warn:#c96a10;
+  --danger:#b3231f;
+  --ok:#1e7d4f;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --disp:'Space Grotesk',sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--body);
+  background:var(--bench);
+  color:var(--ink);
+  min-height:100vh;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size:32px 32px;
+  background-position:-1px -1px;
+}
+header{
+  background:var(--ink);
+  color:#e8f0f7;
+  padding:14px 20px 12px;
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:3px solid var(--air);
+}
+header h1{
+  font-family:var(--disp);
+  font-size:clamp(1.05rem,2.6vw,1.45rem);
+  font-weight:700;letter-spacing:.01em;
+}
+header h1 .id{color:#7db9e0;font-weight:500}
+header .sub{
+  font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;
+  color:#8fa8bd;text-transform:uppercase;
+}
+nav.tabs{
+  display:flex;gap:0;background:var(--ink);
+  padding:0 20px;overflow-x:auto;scrollbar-width:none;
+}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{
+  appearance:none;border:none;background:none;cursor:pointer;
+  font-family:var(--disp);font-size:.85rem;font-weight:600;
+  color:#8fa8bd;padding:10px 16px 12px;
+  border-bottom:3px solid transparent;white-space:nowrap;
+}
+nav.tabs button[aria-selected="true"]{color:#fff;border-bottom-color:var(--air)}
+nav.tabs button:focus-visible{outline:2px solid var(--air);outline-offset:-2px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+.tabpane{display:none}
+.tabpane.active{display:block}
+
+/* ---------- layout: simulate ---------- */
+.sim-grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media(max-width:860px){.sim-grid{grid-template-columns:1fr}}
+.card{
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;box-shadow:0 1px 3px rgba(16,32,46,.07);
+  padding:16px;
+}
+.card h2{
+  font-family:var(--disp);font-size:.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--ink-soft);
+  margin-bottom:12px;display:flex;align-items:center;gap:8px;
+}
+.card h2::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* controls */
+.ctl-group{margin-bottom:18px}
+.ctl-label{
+  font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;display:block;
+}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:7px;overflow:hidden}
+.seg button{
+  flex:1;appearance:none;border:none;background:#fff;cursor:pointer;
+  font-family:var(--disp);font-weight:600;font-size:.88rem;
+  padding:8px 4px;color:var(--ink);border-right:1.5px solid var(--ink);
+}
+.seg button:last-child{border-right:none}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--air);outline-offset:-3px}
+select{
+  width:100%;padding:9px 10px;border:1.5px solid var(--ink);border-radius:7px;
+  font-family:var(--disp);font-weight:600;font-size:.88rem;background:#fff;color:var(--ink);
+}
+.mat-note{font-size:.72rem;color:var(--ink-soft);margin-top:6px;line-height:1.45}
+.mat-note.est{color:var(--warn)}
+
+/* pressure slider */
+.pressure-wrap{position:relative;padding-top:2px}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:34px;background:none;cursor:pointer;
+}
+input[type=range]:focus-visible{outline:2px solid var(--air);outline-offset:2px;border-radius:6px}
+input[type=range]::-webkit-slider-runnable-track{
+  height:12px;border-radius:6px;border:1px solid var(--ink-soft);
+  background:var(--track,linear-gradient(90deg,#0e7ab8,#0e7ab8));
+}
+input[type=range]::-moz-range-track{
+  height:12px;border-radius:6px;border:1px solid var(--ink-soft);
+  background:var(--track,linear-gradient(90deg,#0e7ab8,#0e7ab8));
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:26px;height:26px;margin-top:-8px;border-radius:50%;
+  background:#fff;border:3px solid var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+input[type=range]::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;
+  background:#fff;border:3px solid var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+.pressure-readout{
+  font-family:var(--mono);display:flex;justify-content:space-between;
+  font-size:.7rem;color:var(--ink-soft);margin-top:2px;
+}
+.pressure-big{
+  font-family:var(--mono);font-size:2rem;font-weight:600;text-align:center;
+  margin:4px 0 2px;font-variant-numeric:tabular-nums;
+}
+.pressure-big small{font-size:.9rem;color:var(--ink-soft);font-weight:400}
+.zone-tag{
+  display:block;text-align:center;font-family:var(--mono);font-size:.66rem;
+  letter-spacing:.08em;text-transform:uppercase;padding:3px 0;border-radius:5px;margin-bottom:4px;
+}
+.zone-safe{background:#e2f2e9;color:var(--ok)}
+.zone-warn{background:#fbecd9;color:var(--warn)}
+.zone-danger{background:#f9e2e1;color:var(--danger)}
+
+.mode-row{display:flex;gap:8px;align-items:center}
+.mode-row label{font-size:.78rem;color:var(--ink-soft);display:flex;gap:6px;align-items:center;cursor:pointer}
+
+/* readout tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+.tile{
+  border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:#fbfdfe;
+}
+.tile .k{font-family:var(--mono);font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+.tile .v{font-family:var(--mono);font-size:1.22rem;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:.72rem;font-weight:400;color:var(--ink-soft)}
+.tile.pass .v{color:var(--ok)}
+
+/* viewport */
+.viewport{position:relative;min-height:430px;display:flex;flex-direction:column}
+.viewport svg{flex:1;width:100%;height:auto;display:block}
+.vp-foot{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+  font-family:var(--mono);font-size:.66rem;color:var(--ink-soft);margin-top:8px;
+}
+.legend{display:flex;align-items:center;gap:6px}
+.legend .bar{width:110px;height:9px;border-radius:4px;border:1px solid var(--line);
+  background:linear-gradient(90deg,#1a4f8a,#1f8a7a,#7fae3d,#d8a521,#c4531d,#a01f1c)}
+#burstBanner{
+  position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(179,35,31,.93);color:#fff;border-radius:10px;text-align:center;padding:20px;gap:10px;z-index:5;
+}
+#burstBanner.show{display:flex;animation:flash .5s}
+@keyframes flash{0%{opacity:0}100%{opacity:1}}
+#burstBanner h3{font-family:var(--disp);font-size:1.6rem;letter-spacing:.03em}
+#burstBanner p{font-size:.85rem;max-width:420px;line-height:1.5}
+#burstBanner button{
+  appearance:none;border:2px solid #fff;background:none;color:#fff;border-radius:7px;
+  font-family:var(--disp);font-weight:700;font-size:.9rem;padding:8px 22px;cursor:pointer;
+}
+#burstBanner button:hover{background:#fff;color:var(--danger)}
+
+/* charts */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.chart-grid{grid-template-columns:1fr}}
+.chart-card svg{width:100%;height:auto;display:block}
+.chart-note{font-size:.74rem;color:var(--ink-soft);margin-top:8px;line-height:1.5}
+
+/* materials */
+.mat-grid{display:grid;grid-template-columns:1fr;gap:16px}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;font-variant-numeric:tabular-nums}
+th{background:#f2f6f9;font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft)}
+td.num{font-family:var(--mono);text-align:right}
+tr.sel td{background:#e7f2fa}
+.table-scroll{overflow-x:auto}
+.badge{
+  display:inline-block;font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;
+  padding:2px 7px;border-radius:99px;text-transform:uppercase;
+}
+.badge.exp{background:#e2f2e9;color:var(--ok)}
+.badge.est{background:#fbecd9;color:var(--warn)}
+
+/* about */
+.about p{font-size:.86rem;line-height:1.65;margin-bottom:12px;max-width:74ch}
+.about code{font-family:var(--mono);font-size:.8em;background:#eef3f7;padding:1px 5px;border-radius:4px}
+footer{
+  text-align:center;font-family:var(--mono);font-size:.64rem;color:var(--ink-soft);
+  padding:18px 12px 30px;letter-spacing:.04em;
+}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EPYK Soft Finger Lab <span class="id">· 122M619</span></h1>
+  <span class="sub">Bending pneumatic artificial muscle · silicone finger simulator</span>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="simulate">Simulate</button>
+  <button role="tab" aria-selected="false" data-tab="charts">Response curves</button>
+  <button role="tab" aria-selected="false" data-tab="materials">Materials</button>
+  <button role="tab" aria-selected="false" data-tab="about">About &amp; methods</button>
+</nav>
+
+<main>
+
+<!-- ================= SIMULATE ================= -->
+<section class="tabpane active" id="pane-simulate">
+  <div class="sim-grid">
+    <div class="card" id="controls">
+      <h2>Operating point</h2>
+
+      <div class="ctl-group">
+        <span class="ctl-label">Wall thickness t</span>
+        <div class="seg" id="thickSeg" role="group" aria-label="Wall thickness">
+          <button data-t="2" aria-pressed="false">2 mm</button>
+          <button data-t="3" aria-pressed="true">3 mm</button>
+          <button data-t="4" aria-pressed="false">4 mm</button>
+        </div>
+      </div>
+
+      <div class="ctl-group">
+        <span class="ctl-label">Silicone material</span>
+        <select id="matSel" aria-label="Silicone material"></select>
+        <div class="mat-note" id="matNote"></div>
+      </div>
+
+      <div class="ctl-group">
+        <span class="ctl-label">Supply pressure</span>
+        <div class="pressure-big"><span id="pVal">0</span> <small>kPa</small></div>
+        <span class="zone-tag zone-safe" id="zoneTag">Safe operating zone</span>
+        <div class="pressure-wrap">
+          <input type="range" id="pSlider" min="0" max="130" step="1" value="0" aria-label="Supply pressure in kilopascal">
+          <div class="pressure-readout"><span>0</span><span id="pMaxLabel">130 kPa</span></div>
+        </div>
+      </div>
+
+      <div class="ctl-group">
+        <span class="ctl-label">Data source</span>
+        <div class="mode-row">
+          <label><input type="radio" name="mode" value="exp" checked> Experiment (Table 3.6–3.8)</label>
+        </div>
+        <div class="mode-row">
+          <label><input type="radio" name="mode" value="fea"> FEA · Ansys, Yeoh 2nd order (Table 3.2)</label>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <div class="tile"><div class="k">Bending angle</div><div class="v"><span id="tAngle">0.0</span><small> °</small></div></div>
+        <div class="tile"><div class="k">Tip force (max)</div><div class="v"><span id="tForce">0.00</span><small> N</small></div></div>
+        <div class="tile"><div class="k">Bending moment</div><div class="v"><span id="tMoment">0</span><small> N·mm</small></div></div>
+        <div class="tile" id="critTile"><div class="k">Success criteria ≥120° &amp; ≥100 N·mm</div><div class="v" id="tCrit">—</div></div>
+      </div>
+    </div>
+
+    <div class="card viewport">
+      <h2>Finger — side view <span style="font-family:var(--mono);text-transform:none;letter-spacing:0;font-weight:400">L = 100 mm · 19×19 mm · 6 chambers</span></h2>
+      <svg id="fingerSvg" viewBox="0 0 640 470" role="img" aria-label="Animated cross-section of the silicone finger bending under pressure"></svg>
+      <div class="vp-foot">
+        <span>Glass-fibre base layer (inextensible) shown in amber</span>
+        <span class="legend">chamber strain <span class="bar"></span></span>
+      </div>
+      <div id="burstBanner" role="alert">
+        <h3>Burst failure</h3>
+        <p id="burstMsg"></p>
+        <button id="burstReset">Reset finger</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CHARTS ================= -->
+<section class="tabpane" id="pane-charts">
+  <div class="chart-grid">
+    <div class="card chart-card">
+      <h2>Bending angle vs pressure</h2>
+      <svg id="chartAngle" viewBox="0 0 520 360"></svg>
+      <p class="chart-note">Solid: experimental free-bending angles (Table 3.6). Dashed: FEA prediction (Table 3.2). The marker tracks the current operating point on the Simulate tab. FEA and experiment agree closely for t = 3 and 4 mm; the 2 mm finger bends further in practice (324.5° at 80 kPa) than in the model (295° contact limit).</p>
+    </div>
+    <div class="card chart-card">
+      <h2>Fingertip force vs pressure</h2>
+      <svg id="chartForce" viewBox="0 0 520 360"></svg>
+      <p class="chart-note">Solid: maximum tip force with the force gauge kept normal to the tip (Table 3.8). Dotted: blocked force at 0° position (Table 3.7). Thinner walls give more force at the same pressure — the 2 mm finger reaches 11.34 N at 100 kPa versus 1.98 N for 4 mm at 130 kPa.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MATERIALS ================= -->
+<section class="tabpane" id="pane-materials">
+  <div class="mat-grid">
+    <div class="card">
+      <h2>Candidate RTV-2 mould silicones (Table 3.1 &amp; 3.3)</h2>
+      <div class="table-scroll">
+      <table id="matTable">
+        <thead><tr>
+          <th>Material</th><th>Hardness (Shore A)</th><th>Mix ratio</th><th>Tear strength (kg/cm)</th>
+          <th>Tensile strength (MPa)</th><th>Elongation (%)</th>
+          <th>Mean breaking force (N)</th><th>Mean elongation at break (%)</th><th>Finger data</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+      <p class="chart-note" style="margin-top:10px">VRM-520 was selected for the finger: it matches the 40-Shore materials for breaking force (42.5 N) while giving the highest elongation at break (433.7%) — the most durable <em>and</em> most flexible option. All finger bending and force tables in this app were measured on VRM-520 fingers; other materials are simulated by stiffness scaling (see About).</p>
+    </div>
+    <div class="card chart-card">
+      <h2>VRM-520 uniaxial tensile response (Table 3.5, TS ISO 37 Type-1)</h2>
+      <svg id="chartSS" viewBox="0 0 520 340"></svg>
+      <p class="chart-note">Mean of four dumbbell specimens, 500 mm/min, 23 ± 2 °C; cross-section 13.44 mm², gauge length 75 mm. This curve calibrated the Yeoh 2nd-order hyperelastic model used in the Ansys FEA (density 1150 kg/m³).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABOUT ================= -->
+<section class="tabpane" id="pane-about">
+  <div class="card about">
+    <h2>What this app shows</h2>
+    <p>This simulator reproduces the <strong>EPYK</strong> (Eğilen Pnömatik Yapay Kas — bending pneumatic artificial muscle), the silicone finger developed in Project 122M619 for a flexible robotic gripper and upper-extremity manipulator. The finger is a 6-chamber silicone actuator, total length 100 mm, 19×19 mm cross-section, 85 mm effective bending length, with an inextensible glass-fibre strip (0.15 mm) embedded in the base layer. Pressurising the chambers makes the top surface expand while the base cannot stretch, so the finger curls toward its base.</p>
+    <p><strong>Wall thickness.</strong> Fingers were cast in t = 2, 3 and 4 mm walls (thinner tears in demoulding and punctures easily; thicker approaches a rigid gripper). Burst pressures measured 110 / 130 / 140 kPa; tests ran to 10 kPa below burst. The 3 mm finger was selected for the gripper as the balanced choice across durability, bending angle and tip force (Table 3.9).</p>
+    <p><strong>Data sources.</strong> Bending angle: Table 3.6 (experiment) and Table 3.2 (Ansys Static Structural, Yeoh 2nd-order model, MultiZone hexahedral mesh, large deflection, frictionless self-contact). Tip force: Table 3.7 (blocked, 0° position) and Table 3.8 (maximum, gauge normal to tip). Bending moment uses the 85 mm effective length. Values between measured 10 kPa steps are linearly interpolated.</p>
+    <p><strong>Material scaling.</strong> Finger tests exist only for VRM-520 (Shore A 20). Selecting another silicone scales the response by an estimated modulus ratio from Shore hardness (Gent relation): bending angle ≈ inversely proportional to modulus at equal pressure, tip force approximately preserved at equal angle. These estimates are marked <span class="badge est">estimated</span> in the interface and are for exploration, not for design decisions. Burst pressure for non-tested materials is scaled by tensile strength ratio and equally indicative only.</p>
+    <p><strong>Success criteria.</strong> The project targets were a bending angle ≥ 120° and a bending moment ≥ 100 N·mm; all three wall thicknesses met both experimentally.</p>
+    <p>Source: Project Final Report 122M619, Sections 3.2–3.3 (silicone finger design, FEA, moulding, and test findings). This app is an educational companion; it does not replace the report.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>EPYK Soft Finger Lab · data from Project 122M619 final report · installable PWA · works offline</footer>
+
+<script>
+"use strict";
+/* ============================================================
+   DATA — transcribed from the project final report (122M619)
+   ============================================================ */
+const P_STEP = 10;
+
+// Table 3.6 — experimental free bending angle (deg) vs pressure (kPa)
+const EXP_ANGLE = {
+  2:[0,9.0,57.4,104.1,172.0,297.8,308.0,316.2,324.5],                       // 0..80
+  3:[0,7.4,28.3,58.8,79.4,111.7,137.2,169.7,205.0,247.3,285.9,291.7,294.9], // 0..120
+  4:[0,6.9,23.7,44.0,60.6,82.7,104.1,128.2,164.8,199.4,246.7,280.0,291.5,295.0] // 0..130
+};
+// Table 3.2 — FEA bending angle (deg); ends at contact (295°)
+const FEA_ANGLE = {
+  2:[6,43.6,77.2,141.5,206.5,295],                                   // 0..50
+  3:[4.4,22.9,55.8,90,107.3,159.5,217.6,278.4,295],                  // 0..80
+  4:[3.3,21.3,30.2,47.4,66.1,75.3,95.6,117.3,140.7,153.1,179.9,223.4,255.2,295] // 0..130
+};
+// Table 3.8 — max fingertip force (N), gauge normal to tip
+const FORCE_MAX = {
+  2:[0,0.05,0.14,0.40,0.76,1.65,3.93,6.28,8.59,10.14,11.34],          // 0..100
+  3:[0,0.04,0.11,0.16,0.37,0.60,0.74,1.13,1.74,2.61,4.10,5.53,6.77],  // 0..120
+  4:[0,0.03,0.10,0.15,0.22,0.29,0.38,0.54,0.73,0.94,1.16,1.44,1.88,1.98] // 0..130
+};
+// Table 3.7 — blocked tip force at 0° (N)
+const FORCE_BLOCKED = {
+  2:[0,0,0.15,0.24,0.41,0.65,0.99,1.61,2.52,3.25,4.08],
+  3:[0,0,0.12,0.18,0.26,0.36,0.50,0.72,1.02,1.58,2.26,2.85,3.31],
+  4:[0,0,0.10,0.14,0.19,0.25,0.32,0.39,0.48,0.58,0.75,0.93,1.20,1.27]
+};
+const BURST = {2:110, 3:130, 4:140};      // measured burst pressures, kPa
+const SAFE  = {2:100, 3:120, 4:130};      // tested operating limits, kPa
+const L_EFF = 85;                          // mm, effective bending length
+const CONTACT_ANGLE = 295;                 // deg, tip meets base
+
+// Table 3.1 / 3.3 — materials. E estimated from Shore A via Gent relation.
+function gentE(shoreA){ // MPa
+  return 0.0981*(56+7.62336*shoreA)/(0.137505*(254-2.54*shoreA));
+}
+const MATERIALS = [
+  {id:"VRM520", name:"RTV-2 VRM-520", shore:20, mix:"100:2", tear:"≥22", tensile:3.3, elong:"≥500",
+   fBreak:42.5, eBreak:433.65, tested:true,
+   note:"Selected material — all finger test data measured on VRM-520."},
+  {id:"VRM620", name:"RTV-2 (Pt) VRM-620", shore:20, mix:"1:1", tear:"≥25", tensile:5.0, elong:"≥710",
+   fBreak:46.5, eBreak:254.68, tested:false,
+   note:"Platinum-cure, Shore A 20 — behaviour estimated ≈ VRM-520; higher tensile strength raises the estimated burst margin."},
+  {id:"VRM540", name:"RTV-2 VRM-540", shore:40, mix:"100:2", tear:"≥20", tensile:3.7, elong:"≥250",
+   fBreak:41.0, eBreak:219.18, tested:false,
+   note:"Shore A 40 — estimated ~2.3× stiffer: markedly smaller bending angle at the same pressure."},
+  {id:"G20", name:"AKSİL-G20", shore:20, mix:"1:1", tear:">17.2", tensile:4.5, elong:">875",
+   fBreak:24.5, eBreak:274.0, tested:false,
+   note:"Shore A 20 — bending estimated ≈ VRM-520, but low tear strength lowers the estimated burst pressure."},
+  {id:"G40", name:"AKSİL-G40", shore:40, mix:"1:1", tear:"13.3", tensile:6.3, elong:"675",
+   fBreak:46.5, eBreak:151.38, tested:false,
+   note:"Shore A 40 — estimated ~2.3× stiffer; higher tensile strength but modest elongation."}
+];
+const E520 = gentE(20);
+
+// Table 3.5 — VRM-520 mean stress–strain (loading branch)
+const SS = [[0,0],[0.26,0.12],[0.69,0.27],[1.04,0.42],[1.32,0.56],[1.56,0.73],[1.78,0.87],
+  [1.98,1.01],[2.16,1.18],[2.34,1.32],[2.51,1.47],[2.67,1.63],[2.83,1.78],[2.99,1.91],
+  [3.14,2.08],[3.30,2.23],[3.45,2.37],[3.60,2.54],[3.75,2.67],[3.91,2.82],[4.07,2.99],
+  [4.19,3.12],[4.34,3.17]]; // [strain (mm/mm as fraction of 1? report gives %, values are strain in mm/mm units: 4.34 = 434%), stress MPa]
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  t: 3,
+  mat: MATERIALS[0],
+  p: 0,          // commanded pressure
+  pShown: 0,     // animated pressure
+  mode: "exp",
+  burst: false
+};
+
+function stiffRatio(m){ return gentE(m.shore)/E520; }              // ≥1 for harder
+function burstFor(t, m){
+  if(m.tested) return BURST[t];
+  return Math.round(BURST[t]*Math.min(1.6, m.tensile/3.3));        // tensile-strength scaling, capped
+}
+function safeFor(t,m){ return burstFor(t,m)-10; }
+
+function interp(arr, p){
+  const i = p/P_STEP;
+  const i0 = Math.floor(i), i1 = Math.min(arr.length-1, i0+1);
+  if(i0 >= arr.length-1) return arr[arr.length-1];
+  return arr[i0] + (arr[i1]-arr[i0])*(i-i0);
+}
+function angleAt(p){
+  const table = state.mode==="exp" ? EXP_ANGLE[state.t] : FEA_ANGLE[state.t];
+  const pTest = SAFE[state.t];                       // tables end at tested limit
+  const pEff  = Math.min(p/stiffRatio(state.mat), pTest);
+  const cap   = state.mode==="exp" && state.t===2 ? 324.5 : CONTACT_ANGLE;
+  return Math.min(cap, interp(table, pEff));
+}
+function forceAt(p, blocked){
+  const table = blocked ? FORCE_BLOCKED[state.t] : FORCE_MAX[state.t];
+  const pTest = SAFE[state.t];
+  const pEff  = Math.min(p/stiffRatio(state.mat), pTest);
+  return interp(table, pEff);
+}
+
+/* ============================================================
+   FINGER RENDERING — constant-curvature 6-chamber actuator
+   ============================================================ */
+const svg = document.getElementById("fingerSvg");
+const NS = "http://www.w3.org/2000/svg";
+const SCALE = 3.1;              // px per mm
+const MOUNT = 15, BODY_H = 19;  // mm
+const N_CH = 6;
+
+function strainColor(u){        // u in 0..1 → FEA-style colormap
+  const stops=[[26,79,138],[31,138,122],[127,174,61],[216,165,33],[196,83,29],[160,31,28]];
+  const x = Math.max(0,Math.min(1,u))*(stops.length-1);
+  const i = Math.min(stops.length-2, Math.floor(x)), f = x-i;
+  const c = stops[i].map((v,k)=>Math.round(v+(stops[i+1][k]-v)*f));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+function renderFinger(){
+  const theta = state.burst ? 0 : angleAt(state.pShown);
+  const th = Math.max(theta,0.0001)*Math.PI/180;
+  const R  = L_EFF/th;                       // radius of neutral (base) layer
+  // Centre of curvature C = (0, R) below the clamped base (SVG y grows downward),
+  // so the inextensible fibre layer stays on radius R (constant length L_EFF) and the
+  // chambered top surface lies on radius R + n — it stretches, and the finger curls
+  // downward toward the base layer, exactly as in the report's Figure 3.28.
+  const C = {x:0, y:R};
+  const P=(s,n)=>{                           // s along base 0..L_EFF, n height above fibre (0..BODY_H)
+    const a=(s/L_EFF)*th;
+    const r=R + n;
+    return { x: C.x + r*Math.sin(a), y: C.y - r*Math.cos(a) };
+  };
+
+  // build geometry in mm, then transform to px
+  const els=[];
+  const mm=(p)=>({x:60+ (MOUNT+p.x)*SCALE, y:150 + p.y*SCALE});
+
+  // mount block
+  const yMid = 150 - BODY_H*SCALE/2;
+  els.push(`<rect x="${60-14}" y="${150-BODY_H*SCALE-6}" width="${14+MOUNT*SCALE}" height="${BODY_H*SCALE+12}" rx="4" fill="#2c3e50" stroke="#10202e" stroke-width="2"/>`);
+  els.push(`<rect x="${60-26}" y="${yMid-9}" width="14" height="18" rx="3" fill="#5b6f81"/>`); // air fitting
+  // air line pulse
+  const airOn = state.pShown>1 && !state.burst;
+  els.push(`<line x1="${60-26}" y1="${yMid}" x2="18" y2="${yMid}" stroke="${airOn?'#0e7ab8':'#9fb4c4'}" stroke-width="5" stroke-linecap="round" ${airOn?'stroke-dasharray="2 9"':''}>${airOn?'<animate attributeName="stroke-dashoffset" from="0" to="-22" dur="0.5s" repeatCount="indefinite"/>':''}</line>`);
+
+  // silicone body outline (top surface + tip + base back)
+  const NPTS=48;
+  let d="M";
+  for(let i=0;i<=NPTS;i++){ const q=mm(P(L_EFF*i/NPTS, BODY_H)); d+=`${q.x.toFixed(1)},${q.y.toFixed(1)} `; if(i===0)d+="L";}
+  for(let i=NPTS;i>=0;i--){ const q=mm(P(L_EFF*i/NPTS, 0));      d+=`L${q.x.toFixed(1)},${q.y.toFixed(1)} `;}
+  d+="Z";
+  els.push(`<path d="${d}" fill="var(--silicone)" stroke="var(--silicone-edge)" stroke-width="2" stroke-linejoin="round"/>`);
+
+  // chambers: 6 cells along the length, inflating with pressure
+  const pFrac = Math.max(0, Math.min(1, state.pShown/Math.max(1,safeFor(state.t,state.mat))));
+  const wall = state.t;                                 // mm
+  const cellL = (L_EFF - 7*wall)/N_CH;                  // usable chamber length
+  for(let c=0;c<N_CH;c++){
+    const s0 = wall + c*(cellL+wall);
+    const s1 = s0 + cellL;
+    const bulge = pFrac * (2.2 + (4-wall)*0.9);         // thinner walls bulge more (mm)
+    const hTop = BODY_H - wall + bulge;                 // chamber ceiling rises
+    const hBot = wall + 1.5;                            // above fibre layer
+    const local = angleAt(state.pShown)/CONTACT_ANGLE;
+    const col = strainColor(0.15 + 0.85*local*pFrac);
+    let cd="M";
+    const M=10;
+    for(let i=0;i<=M;i++){ const s=s0+(s1-s0)*i/M;
+      const bell = Math.sin(Math.PI*i/M)*bulge;         // rounded roof
+      const q=mm(P(s, Math.min(BODY_H-0.6, BODY_H-wall+bell)));
+      cd+=`${q.x.toFixed(1)},${q.y.toFixed(1)} `; if(i===0)cd+="L";}
+    for(let i=M;i>=0;i--){ const s=s0+(s1-s0)*i/M; const q=mm(P(s,hBot));
+      cd+=`L${q.x.toFixed(1)},${q.y.toFixed(1)} `;}
+    cd+="Z";
+    els.push(`<path d="${cd}" fill="${col}" fill-opacity="0.82" stroke="${col}" stroke-width="1"/>`);
+  }
+
+  // glass fibre base layer
+  let fd="M";
+  for(let i=0;i<=NPTS;i++){ const q=mm(P(L_EFF*i/NPTS,0)); fd+=`${q.x.toFixed(1)},${q.y.toFixed(1)} `; if(i===0)fd+="L";}
+  els.push(`<path d="${fd}" fill="none" stroke="var(--fiber)" stroke-width="3.5" stroke-linecap="round"/>`);
+
+  // tip marker + angle arc
+  const tip = mm(P(L_EFF,0));
+  els.push(`<circle cx="${tip.x}" cy="${tip.y}" r="5" fill="#10202e"/>`);
+  const lbl = mm(P(L_EFF*0.5, BODY_H+6));
+  els.push(`<text x="${lbl.x}" y="${lbl.y}" font-family="IBM Plex Mono,monospace" font-size="15" font-weight="600" fill="#10202e" text-anchor="middle">${theta.toFixed(1)}°</text>`);
+
+  // ground reference line through the base start
+  els.push(`<line x1="40" y1="150" x2="620" y2="150" stroke="#ccd7e0" stroke-width="1" stroke-dasharray="5 6"/>`);
+
+  svg.innerHTML = els.join("");
+}
+
+/* ============================================================
+   CHARTS (hand-rolled SVG)
+   ============================================================ */
+function drawAxes(el, xmax, ymax, xlab, ylab, yticks, xticks){
+  const W=520, H=el.viewBox.baseVal.height, mL=52, mB=40, mT=14, mR=14;
+  const px=x=>mL+(W-mL-mR)*x/xmax, py=y=>H-mB-(H-mB-mT)*y/ymax;
+  let s=`<rect x="${mL}" y="${mT}" width="${W-mL-mR}" height="${H-mB-mT}" fill="#fbfdfe" stroke="#ccd7e0"/>`;
+  for(const t of yticks){ s+=`<line x1="${mL}" x2="${W-mR}" y1="${py(t)}" y2="${py(t)}" stroke="#e4ebf1"/><text x="${mL-7}" y="${py(t)+4}" text-anchor="end" font-size="11" font-family="IBM Plex Mono" fill="#3d5165">${t}</text>`;}
+  for(const t of xticks){ s+=`<line y1="${mT}" y2="${H-mB}" x1="${px(t)}" x2="${px(t)}" stroke="#e4ebf1"/><text y="${H-mB+16}" x="${px(t)}" text-anchor="middle" font-size="11" font-family="IBM Plex Mono" fill="#3d5165">${t}</text>`;}
+  s+=`<text x="${(mL+W-mR)/2}" y="${H-6}" text-anchor="middle" font-size="12" font-family="Space Grotesk" font-weight="600" fill="#10202e">${xlab}</text>`;
+  s+=`<text x="14" y="${(mT+H-mB)/2}" text-anchor="middle" font-size="12" font-family="Space Grotesk" font-weight="600" fill="#10202e" transform="rotate(-90 14 ${(mT+H-mB)/2})">${ylab}</text>`;
+  return {s, px, py};
+}
+function pathOf(arr, px, py, step=P_STEP){
+  return arr.map((v,i)=>`${i?'L':'M'}${px(i*step).toFixed(1)},${py(v).toFixed(1)}`).join("");
+}
+const TCOL={2:"#0e7ab8",3:"#1e7d4f",4:"#a24ba0"};
+
+function renderChartAngle(){
+  const el=document.getElementById("chartAngle");
+  const {s,px,py}=drawAxes(el,130,340,"Pressure (kPa)","Bending angle (°)",[0,60,120,180,240,300],[0,20,40,60,80,100,120]);
+  let out=s;
+  out+=`<line x1="${px(0)}" x2="${px(130)}" y1="${py(120)}" y2="${py(120)}" stroke="#c96a10" stroke-dasharray="3 4"/><text x="${px(126)}" y="${py(120)-5}" text-anchor="end" font-size="10" font-family="IBM Plex Mono" fill="#c96a10">target 120°</text>`;
+  for(const t of [2,3,4]){
+    out+=`<path d="${pathOf(FEA_ANGLE[t],px,py)}" fill="none" stroke="${TCOL[t]}" stroke-width="1.6" stroke-dasharray="6 5" opacity="0.7"/>`;
+    out+=`<path d="${pathOf(EXP_ANGLE[t],px,py)}" fill="none" stroke="${TCOL[t]}" stroke-width="2.6"/>`;
+    const last=EXP_ANGLE[t].length-1;
+    out+=`<text x="${px(last*10)+4}" y="${py(EXP_ANGLE[t][last])}" font-size="12" font-family="Space Grotesk" font-weight="700" fill="${TCOL[t]}">t=${t}</text>`;
+  }
+  if(!state.burst){
+    const pe=Math.min(state.p/stiffRatio(state.mat), SAFE[state.t]);
+    out+=`<circle cx="${px(pe)}" cy="${py(angleAt(state.p))}" r="6" fill="none" stroke="#10202e" stroke-width="2.5"/>`;
+  }
+  el.innerHTML=out;
+}
+function renderChartForce(){
+  const el=document.getElementById("chartForce");
+  const {s,px,py}=drawAxes(el,130,12,"Pressure (kPa)","Tip force (N)",[0,2,4,6,8,10,12],[0,20,40,60,80,100,120]);
+  let out=s;
+  for(const t of [2,3,4]){
+    out+=`<path d="${pathOf(FORCE_BLOCKED[t],px,py)}" fill="none" stroke="${TCOL[t]}" stroke-width="1.6" stroke-dasharray="2 4" opacity="0.75"/>`;
+    out+=`<path d="${pathOf(FORCE_MAX[t],px,py)}" fill="none" stroke="${TCOL[t]}" stroke-width="2.6"/>`;
+    const last=FORCE_MAX[t].length-1;
+    out+=`<text x="${px(last*10)-2}" y="${py(FORCE_MAX[t][last])-8}" font-size="12" font-family="Space Grotesk" font-weight="700" fill="${TCOL[t]}">t=${t}</text>`;
+  }
+  if(!state.burst){
+    const pe=Math.min(state.p/stiffRatio(state.mat), SAFE[state.t]);
+    out+=`<circle cx="${px(pe)}" cy="${py(forceAt(state.p,false))}" r="6" fill="none" stroke="#10202e" stroke-width="2.5"/>`;
+  }
+  el.innerHTML=out;
+}
+function renderChartSS(){
+  const el=document.getElementById("chartSS");
+  const {s,px,py}=drawAxes(el,450,3.5,"Strain (%)","Stress (MPa)",[0,0.5,1,1.5,2,2.5,3,3.5],[0,100,200,300,400]);
+  let out=s;
+  let d="";
+  SS.forEach(([e,sg],i)=>{ d+=`${i?'L':'M'}${px(e*100).toFixed(1)},${py(sg).toFixed(1)}`; });
+  out+=`<path d="${d}" fill="none" stroke="#0e7ab8" stroke-width="2.8"/>`;
+  const [eb,sb]=SS[SS.length-1];
+  out+=`<circle cx="${px(eb*100)}" cy="${py(sb)}" r="5" fill="#b3231f"/><text x="${px(eb*100)-8}" y="${py(sb)-8}" text-anchor="end" font-size="11" font-family="IBM Plex Mono" fill="#b3231f">break 3.17 MPa @ 434%</text>`;
+  el.innerHTML=out;
+}
+
+/* ============================================================
+   MATERIALS TABLE
+   ============================================================ */
+function renderMatTable(){
+  const tb=document.querySelector("#matTable tbody");
+  tb.innerHTML = MATERIALS.map(m=>`
+    <tr class="${m.id===state.mat.id?'sel':''}">
+      <td><strong>${m.name}</strong></td>
+      <td class="num">${m.shore}±1</td><td class="num">${m.mix}</td>
+      <td class="num">${m.tear}</td><td class="num">${m.tensile.toFixed(1)}</td><td class="num">${m.elong}</td>
+      <td class="num">${m.fBreak.toFixed(1)}</td><td class="num">${m.eBreak.toFixed(1)}</td>
+      <td>${m.tested?'<span class="badge exp">Measured</span>':'<span class="badge est">Estimated</span>'}</td>
+    </tr>`).join("");
+}
+
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+const pSlider=document.getElementById("pSlider");
+const pVal=document.getElementById("pVal");
+const zoneTag=document.getElementById("zoneTag");
+const pMaxLabel=document.getElementById("pMaxLabel");
+
+function updateSliderRange(){
+  const b=burstFor(state.t,state.mat);
+  pSlider.max=b+10;
+  pMaxLabel.textContent=`${b+10} kPa`;
+  const safe=safeFor(state.t,state.mat);
+  const s=100*safe/(b+10), bb=100*b/(b+10);
+  const track=`linear-gradient(90deg,#0e7ab8 0%,#0e7ab8 ${s}%,#e0a13f ${s}%,#e0a13f ${bb}%,#b3231f ${bb}%,#b3231f 100%)`;
+  pSlider.style.setProperty("--track",track);
+  if(state.p>b+10){state.p=b+10; pSlider.value=state.p;}
+}
+function updateZone(){
+  const b=burstFor(state.t,state.mat), safe=safeFor(state.t,state.mat);
+  zoneTag.className="zone-tag "+(state.p<=safe?"zone-safe":state.p<b?"zone-warn":"zone-danger");
+  zoneTag.textContent=state.p<=safe?"Safe operating zone (tested range)":state.p<b?"Approaching burst pressure":"Burst pressure exceeded";
+}
+function checkBurst(){
+  const b=burstFor(state.t,state.mat);
+  if(state.p>=b && !state.burst){
+    state.burst=true;
+    const banner=document.getElementById("burstBanner");
+    document.getElementById("burstMsg").textContent=
+      `The t = ${state.t} mm finger ${state.mat.tested?'burst at':'is estimated to burst near'} ${b} kPa`+
+      ` — matching the report's burst tests (110 / 130 / 140 kPa for 2 / 3 / 4 mm walls in VRM-520). `+
+      `Operating pressure was limited to ${safeFor(state.t,state.mat)} kPa in all bending and force tests.`;
+    banner.classList.add("show");
+  }
+}
+document.getElementById("burstReset").addEventListener("click",()=>{
+  state.burst=false; state.p=0; state.pShown=0; pSlider.value=0;
+  document.getElementById("burstBanner").classList.remove("show");
+  updateAll();
+});
+
+pSlider.addEventListener("input",()=>{ state.p=+pSlider.value; checkBurst(); updateAll(false); });
+
+document.querySelectorAll("#thickSeg button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll("#thickSeg button").forEach(x=>x.setAttribute("aria-pressed","false"));
+    b.setAttribute("aria-pressed","true");
+    state.t=+b.dataset.t; state.burst=false;
+    document.getElementById("burstBanner").classList.remove("show");
+    updateSliderRange(); updateAll();
+  });
+});
+
+const matSel=document.getElementById("matSel");
+MATERIALS.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=`${m.name} · Shore A ${m.shore}`; matSel.appendChild(o); });
+matSel.addEventListener("change",()=>{
+  state.mat=MATERIALS[+matSel.value]; state.burst=false;
+  document.getElementById("burstBanner").classList.remove("show");
+  updateSliderRange(); renderMatTable(); updateAll();
+});
+
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener("change",()=>{ state.mode=r.value; updateAll(); }));
+
+document.querySelectorAll("nav.tabs button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected","false"));
+    b.setAttribute("aria-selected","true");
+    document.querySelectorAll(".tabpane").forEach(p=>p.classList.remove("active"));
+    document.getElementById("pane-"+b.dataset.tab).classList.add("active");
+    if(b.dataset.tab==="charts"){renderChartAngle();renderChartForce();}
+    if(b.dataset.tab==="materials"){renderChartSS();renderMatTable();}
+  });
+});
+
+function updateReadouts(){
+  const theta=state.burst?0:angleAt(state.p);
+  const F=state.burst?0:forceAt(state.p,false);
+  const M=F*L_EFF;
+  document.getElementById("pVal").textContent=state.p;
+  document.getElementById("tAngle").textContent=theta.toFixed(1);
+  document.getElementById("tForce").textContent=F.toFixed(2);
+  document.getElementById("tMoment").textContent=M.toFixed(0);
+  const pass=theta>=120 && M>=100;
+  const crit=document.getElementById("tCrit");
+  crit.textContent=state.burst?"FAILED":pass?"MET":"not yet";
+  crit.style.color=state.burst?"var(--danger)":pass?"var(--ok)":"var(--ink-soft)";
+  const note=document.getElementById("matNote");
+  note.textContent=state.mat.note;
+  note.className="mat-note"+(state.mat.tested?"":" est");
+}
+
+let animId=null;
+function animate(){
+  const target=state.burst?0:state.p;
+  state.pShown += (target-state.pShown)*0.14;
+  if(Math.abs(target-state.pShown)<0.15){state.pShown=target;}
+  renderFinger();
+  if(state.pShown!==target){animId=requestAnimationFrame(animate);}else{animId=null;}
+}
+const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function updateAll(){
+  updateZone(); updateReadouts();
+  if(reduceMotion){ state.pShown=state.burst?0:state.p; renderFinger(); }
+  else if(!animId){ animId=requestAnimationFrame(animate); }
+  if(document.getElementById("pane-charts").classList.contains("active")){renderChartAngle();renderChartForce();}
+}
+
+updateSliderRange(); renderMatTable(); renderChartSS(); updateAll();
+
+/* PWA service worker */
+if("serviceWorker" in navigator){
+  addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
